@@ -4,9 +4,9 @@ Experimental BepInEx 5 plugin for hosting a current Risk of Rain 2 client as a h
 
 ## Status
 
-The plugin builds against the installed February 2026 `RoR2.dll`. It replaces desktop Steam client startup, skips Steam game-server initialization, and asks the game's existing server-only network path to listen on UDP port 7777. A scratch-copy boot **without Steam desktop running** stayed resident, reached the game's initialized server state, bound UDP `0.0.0.0:7777`, and had no signed-in local user. **Remote join, lobby flow, run start, and reset are not verified yet.** This is not ready for an exposed public server: skipping Steam game-server initialization also skips Steam ticket verification.
+The plugin builds against the installed February 2026 `RoR2.dll`. It replaces desktop Steam client startup, skips Steam game-server initialization, and asks the game's existing server-only network path to listen on UDP port 7777. A Proton container booted without Steam desktop, reached the game's initialized server state, bound UDP 7777, and had no signed-in local user. A real client joined over the tailnet, readied in the lobby, and triggered a run start. Game-over and disconnect reset remain unverified. This is not ready for an exposed public server: skipping Steam game-server initialization also skips Steam ticket verification.
 
-The original brainstorm named methods that are absent in this build. In particular, `RoR2.SteamManager.Awake()` and `ServerReturnToLobby()` are not present. The code uses the actual `PlatformSystems`, `NetworkManagerSystemSteam`, and `HostDescription` APIs found in the installed assemblies. The game's `VoteController` handles ready votes and calls its configured launch action; this flow still needs a remote-client check on the dedicated host.
+The original brainstorm named methods that are absent in this build. In particular, `RoR2.SteamManager.Awake()` and `ServerReturnToLobby()` are not present. The code uses the actual `PlatformSystems`, `NetworkManagerSystemSteam`, and `HostDescription` APIs found in the installed assemblies. The game's `VoteController` handles ready votes and calls its configured launch action; the remote-client test confirmed that the action starts a run.
 
 ## Build and local test on Windows
 
@@ -48,8 +48,8 @@ Put extra server mods and their dependencies in a BepInEx profile, then pass its
 
 ## Verification still required
 
-- Connect an unmodified remote client and verify the handshake and player slot count.
-- Add lobby readiness and automatic launch based on the current game's actual lobby APIs.
+- Verify player slot counts and simultaneous play with multiple remote clients.
+- Verify a complete run and return to lobby.
 - Add a tested game-over and disconnect reset flow.
 - Decide how a public deployment should authenticate clients, since the current direct-IP path does not validate Steam tickets.
 
