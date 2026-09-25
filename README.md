@@ -44,11 +44,11 @@ Put extra server mods and their dependencies in a BepInEx profile, then pass its
 
 `-ModsPath` accepts a profile root containing `BepInEx`, or the `BepInEx` folder itself. It copies `plugins`, `patchers`, and `config` into the isolated server. The dedicated server plugin remains in `BepInEx/plugins`.
 
-Only mods designed to run on the server while remaining compatible with vanilla clients meet the no-client-install goal. Mods that add characters, items, assets, UI, or custom network messages generally require clients to install matching mods. The [RoR2 modding wiki](https://risk-of-thunder.github.io/R2Wiki/Mod-Creation/C%23-Programming/Networking/Server-side-and-client-side-mods/) explains the distinction and the `NetworkCompatibility` attribute. Test each server mod with an unmodded client before adding it to a hosted profile.
+**Clients must remain unmodified.** The server does not send mods to clients, and joining requires no launcher, bootstrap plugin, or client-side files. Only server-side mods that work through the game's existing network protocol belong in a hosted profile. Mods that add characters, items, assets, UI, or custom network messages generally require matching client mods and are outside this project's supported scope. The [RoR2 modding wiki](https://risk-of-thunder.github.io/R2Wiki/Mod-Creation/C%23-Programming/Networking/Server-side-and-client-side-mods/) explains the distinction and the `NetworkCompatibility` attribute. Test each server mod with an unmodified client before adding it to a hosted profile.
 
 ## Verification still required
 
-- Connect a remote client and verify the handshake and player slot count.
+- Connect an unmodified remote client and verify the handshake and player slot count.
 - Add lobby readiness and automatic launch based on the current game's actual lobby APIs.
 - Add a tested game-over and disconnect reset flow.
 - Decide how a public deployment should authenticate clients, since the current direct-IP path does not validate Steam tickets.
