@@ -1,0 +1,6 @@
+.scratch/
+bin/
+obj/
+.vs/
+*.user
+*.log
