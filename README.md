@@ -55,4 +55,4 @@ Only mods designed to run on the server while remaining compatible with vanilla 
 
 ## Docker follow-up
 
-A separate image repository will use Proton, this plugin's build artifact, and a user-provided current game install. It will include a Helm chart whose values can list server mods. [avivace/ror2-server](https://github.com/avivace/ror2-server) is a reference for container layout, although it uses the old official server. The image will not embed or publish proprietary game files.
+The [Proton image and Helm chart repository](https://github.com/zdiemer/ror2-unofficial-dedicated-server-docker) uses this plugin's build artifact and a user-provided current game install. Its Helm values can list server mods. [avivace/ror2-server](https://github.com/avivace/ror2-server) is a reference for container layout, although it uses the old official server. The image does not embed or publish proprietary game files.
