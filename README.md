@@ -16,7 +16,7 @@ Requirements: a legally installed current Risk of Rain 2 client, .NET SDK, Power
 .\scripts\Prepare-LocalServer.ps1 -GamePath 'C:\Program Files (x86)\Steam\steamapps\common\Risk of Rain 2'
 ```
 
-The script copies the game into ignored `.scratch/server`, downloads [BepInEx 5.4.23.5](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.5), builds the plugin, and installs it **only in the scratch copy**. It never edits the original installation.
+The script copies the game into ignored `.scratch/server`, downloads [BepInEx 5.4.23.5](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.5), builds the plugin, and installs it **only in the scratch copy**. It never edits the original installation. Stop the scratch server before rerunning the script.
 
 Launch from `.scratch/server`:
 
@@ -34,6 +34,18 @@ connect "SERVER_IP:7777"
 
 Direct-IP access requires UDP port forwarding and a matching game version. The client should have crossplay disabled.
 
+## Server mods
+
+Put extra server mods and their dependencies in a BepInEx profile, then pass its path to the preparation script:
+
+```powershell
+.\scripts\Prepare-LocalServer.ps1 -GamePath 'C:\Program Files (x86)\Steam\steamapps\common\Risk of Rain 2' -ModsPath 'D:\ror2-server-mod-profile'
+```
+
+`-ModsPath` accepts a profile root containing `BepInEx`, or the `BepInEx` folder itself. It copies `plugins`, `patchers`, and `config` into the isolated server. The dedicated server plugin remains in `BepInEx/plugins`.
+
+Only mods designed to run on the server while remaining compatible with vanilla clients meet the no-client-install goal. Mods that add characters, items, assets, UI, or custom network messages generally require clients to install matching mods. The [RoR2 modding wiki](https://risk-of-thunder.github.io/R2Wiki/Mod-Creation/C%23-Programming/Networking/Server-side-and-client-side-mods/) explains the distinction and the `NetworkCompatibility` attribute. Test each server mod with an unmodded client before adding it to a hosted profile.
+
 ## Verification still required
 
 - Connect a remote client and verify the handshake and player slot count.
@@ -43,4 +55,4 @@ Direct-IP access requires UDP port forwarding and a matching game version. The c
 
 ## Docker follow-up
 
-A separate image repository can consume this plugin's build artifact and a user-provided current game install. [avivace/ror2-server](https://github.com/avivace/ror2-server) uses Wine for the old official server, so its Wine and runtime setup is a useful reference. The image should never embed or publish proprietary game files. Docker packaging follows after the local headless and remote-client checks pass.
+A separate image repository will use Proton, this plugin's build artifact, and a user-provided current game install. It will include a Helm chart whose values can list server mods. [avivace/ror2-server](https://github.com/avivace/ror2-server) is a reference for container layout, although it uses the old official server. The image will not embed or publish proprietary game files.

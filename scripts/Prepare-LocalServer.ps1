@@ -1,5 +1,6 @@
 param(
-    [Parameter(Mandatory = $true)][string] $GamePath
+    [Parameter(Mandatory = $true)][string] $GamePath,
+    [string] $ModsPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,4 +38,19 @@ if ($LASTEXITCODE -ne 0) { throw 'Plugin build failed.' }
 $plugins = Join-Path $server 'BepInEx\plugins'
 New-Item -ItemType Directory -Force $plugins | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'src\Ror2UnofficialDedicatedServer\bin\Release\net472\Ror2UnofficialDedicatedServer.dll') -Destination $plugins -Force
+
+if ($ModsPath) {
+    $modsRoot = (Resolve-Path -LiteralPath $ModsPath).Path
+    if (Test-Path -LiteralPath (Join-Path $modsRoot 'BepInEx')) {
+        $modsRoot = Join-Path $modsRoot 'BepInEx'
+    }
+    foreach ($folder in @('plugins', 'patchers', 'config')) {
+        $source = Join-Path $modsRoot $folder
+        if (Test-Path -LiteralPath $source) {
+            $destination = Join-Path $server (Join-Path 'BepInEx' $folder)
+            New-Item -ItemType Directory -Force $destination | Out-Null
+            Get-ChildItem -LiteralPath $source -Force | Copy-Item -Destination $destination -Recurse -Force
+        }
+    }
+}
 Write-Host "Prepared isolated server at $server"

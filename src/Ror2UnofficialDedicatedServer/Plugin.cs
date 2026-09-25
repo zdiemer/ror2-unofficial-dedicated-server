@@ -1,9 +1,11 @@
 using System;
+using System.Collections;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 using RoR2;
 using RoR2.Networking;
+using UnityEngine;
 using UnityEngine.Networking;
 
 namespace Ror2UnofficialDedicatedServer
@@ -14,7 +16,10 @@ namespace Ror2UnofficialDedicatedServer
         private Harmony harmony;
         private ConfigEntry<int> port;
         private ConfigEntry<int> maxPlayers;
+        private ConfigEntry<float> gameOverReturnDelay;
         private float nextStatusTime;
+        private float nextDisconnectCheck;
+        private Coroutine returnToLobby;
 
         internal static Plugin Instance { get; private set; }
 
@@ -29,7 +34,8 @@ namespace Ror2UnofficialDedicatedServer
             Instance = this;
             port = Config.Bind("Server", "Port", 7777, "UDP listen port (1-65535).");
             maxPlayers = Config.Bind("Server", "MaxPlayers", 4, "Maximum remote players.");
-            if (port.Value < 1 || port.Value > 65535 || maxPlayers.Value < 1 || maxPlayers.Value > RoR2Application.hardMaxPlayers)
+            gameOverReturnDelay = Config.Bind("Server", "GameOverReturnDelaySeconds", 20f, "Delay before returning players to the lobby after game over.");
+            if (port.Value < 1 || port.Value > 65535 || maxPlayers.Value < 1 || maxPlayers.Value > RoR2Application.hardMaxPlayers || gameOverReturnDelay.Value < 0f)
             {
                 Logger.LogError("Invalid Port or MaxPlayers; server mode was not started.");
                 Instance = null;
@@ -39,22 +45,52 @@ namespace Ror2UnofficialDedicatedServer
             harmony = new Harmony("com.zdiemer.ror2.unofficialdedicatedserver");
             harmony.PatchAll(typeof(Plugin).Assembly);
             RoR2Application.onLoadFinished += StartDedicatedServer;
+            Run.onServerGameOver += OnServerGameOver;
             Logger.LogInfo("Dedicated server mode armed.");
         }
 
         private void OnDestroy()
         {
             RoR2Application.onLoadFinished -= StartDedicatedServer;
+            Run.onServerGameOver -= OnServerGameOver;
+            if (returnToLobby != null) StopCoroutine(returnToLobby);
             harmony?.UnpatchSelf();
             Instance = null;
         }
 
         private void Update()
         {
-            if (Instance != this || UnityEngine.Time.unscaledTime < nextStatusTime) return;
-            nextStatusTime = UnityEngine.Time.unscaledTime + 15f;
+            if (Instance != this) return;
+            if (Time.unscaledTime >= nextDisconnectCheck)
+            {
+                nextDisconnectCheck = Time.unscaledTime + 5f;
+                if (NetworkServer.active && Run.instance && NetworkUser.readOnlyInstancesList.Count == 0 && returnToLobby == null)
+                {
+                    Logger.LogInfo("No players remain in the run; returning to lobby.");
+                    returnToLobby = StartCoroutine(ReturnToLobby(Run.instance, 0f));
+                }
+            }
+            if (Time.unscaledTime < nextStatusTime) return;
+            nextStatusTime = Time.unscaledTime + 15f;
             var manager = PlatformSystems.networkManager;
             Logger.LogInfo($"Status: loaded={RoR2Application.loadFinished}, initialized={SystemInitializerAttribute.hasExecuted}, manager={((bool)manager)}, server={NetworkServer.active}, localUser={LocalUserManager.isAnyUserSignedIn}");
+        }
+
+        private void OnServerGameOver(Run run, GameEndingDef ending)
+        {
+            if (Instance != this || !NetworkServer.active || returnToLobby != null) return;
+            Logger.LogInfo($"Game over ({ending.cachedName}); returning to lobby in {gameOverReturnDelay.Value} seconds.");
+            returnToLobby = StartCoroutine(ReturnToLobby(run, gameOverReturnDelay.Value));
+        }
+
+        private IEnumerator ReturnToLobby(Run run, float delay)
+        {
+            if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
+            if (NetworkServer.active && Run.instance == run && PlatformSystems.networkManager)
+            {
+                PlatformSystems.networkManager.ServerChangeScene("lobby");
+            }
+            returnToLobby = null;
         }
 
         private void StartDedicatedServer()
