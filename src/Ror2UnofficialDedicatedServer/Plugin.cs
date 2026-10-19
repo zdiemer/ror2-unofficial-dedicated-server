@@ -7,16 +7,20 @@ using RoR2;
 using RoR2.Networking;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.Rendering;
 
 namespace Ror2UnofficialDedicatedServer
 {
-    [BepInPlugin("com.zdiemer.ror2.unofficialdedicatedserver", "RoR2 Unofficial Dedicated Server", "0.1.0")]
+    [BepInPlugin("com.zdiemer.ror2.unofficialdedicatedserver", "RoR2 Unofficial Dedicated Server", "0.1.1")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private Harmony harmony;
         private ConfigEntry<int> port;
         private ConfigEntry<int> maxPlayers;
         private ConfigEntry<float> gameOverReturnDelay;
+        private ConfigEntry<int> idleFrameRate;
+        private ConfigEntry<int> activeFrameRate;
+        private bool? idleMode;
         private float nextStatusTime;
         private float nextDisconnectCheck;
         private Coroutine returnToLobby;
@@ -42,6 +46,11 @@ namespace Ror2UnofficialDedicatedServer
                 return;
             }
 
+            idleFrameRate = Config.Bind("Performance", "IdleFrameRate", 10,
+                new ConfigDescription("Update rate when no clients are connected.", new AcceptableValueRange<int>(5, 60)));
+            activeFrameRate = Config.Bind("Performance", "ActiveFrameRate", 60,
+                new ConfigDescription("Update rate while clients are connected or startup is incomplete.", new AcceptableValueRange<int>(30, 120)));
+
             harmony = new Harmony("com.zdiemer.ror2.unofficialdedicatedserver");
             harmony.PatchAll(typeof(Plugin).Assembly);
             RoR2Application.onLoadFinished += StartDedicatedServer;
@@ -61,6 +70,7 @@ namespace Ror2UnofficialDedicatedServer
         private void Update()
         {
             if (Instance != this) return;
+            ApplyFrameBudget();
             if (Time.unscaledTime >= nextDisconnectCheck)
             {
                 nextDisconnectCheck = Time.unscaledTime + 5f;
@@ -73,7 +83,34 @@ namespace Ror2UnofficialDedicatedServer
             if (Time.unscaledTime < nextStatusTime) return;
             nextStatusTime = Time.unscaledTime + 15f;
             var manager = PlatformSystems.networkManager;
-            Logger.LogInfo($"Status: loaded={RoR2Application.loadFinished}, initialized={SystemInitializerAttribute.hasExecuted}, manager={((bool)manager)}, server={NetworkServer.active}, localUser={LocalUserManager.isAnyUserSignedIn}");
+            Logger.LogInfo($"Status: loaded={RoR2Application.loadFinished}, initialized={SystemInitializerAttribute.hasExecuted}, manager={((bool)manager)}, server={NetworkServer.active}, localUser={LocalUserManager.isAnyUserSignedIn}, connections={ConnectedClients()}, players={NetworkUser.readOnlyInstancesList.Count}, idle={idleMode}, targetFps={Application.targetFrameRate}, renderInterval={OnDemandRendering.renderFrameInterval}");
+        }
+
+        private static int ConnectedClients()
+        {
+            // Count transport connections, including clients still loading before
+            // their NetworkUser exists. Restore the active budget on the next update.
+            int count = 0;
+            foreach (var connection in NetworkServer.connections)
+                if (connection != null) count++;
+            return count;
+        }
+
+        private void ApplyFrameBudget()
+        {
+            bool ready = RoR2Application.loadFinished && SystemInitializerAttribute.hasExecuted && NetworkServer.active;
+            bool idle = ready && ConnectedClients() == 0 && NetworkUser.readOnlyInstancesList.Count == 0;
+            int fps = idle ? idleFrameRate.Value : activeFrameRate.Value;
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = fps;
+            // Keep one rendered frame per second for render/end-of-frame callbacks.
+            // Do not suppress startup rendering: loading can depend on those callbacks.
+            OnDemandRendering.renderFrameInterval = ready ? fps : 1;
+            if (idleMode != idle)
+            {
+                idleMode = idle;
+                Logger.LogInfo($"Server frame budget: idle={idle}, updateFps={fps}, renderInterval={OnDemandRendering.renderFrameInterval}");
+            }
         }
 
         private void OnServerGameOver(Run run, GameEndingDef ending)

@@ -56,3 +56,11 @@ Put extra server mods and their dependencies in a BepInEx profile, then pass its
 ## Docker follow-up
 
 The [Proton image and Helm chart repository](https://github.com/zdiemer/ror2-unofficial-dedicated-server-docker) uses this plugin's build artifact and a user-provided current game install. Its Helm values can list server mods. [avivace/ror2-server](https://github.com/avivace/ror2-server) is a reference for container layout, although it uses the old official server. The image does not embed or publish proprietary game files.
+
+## Server CPU budget
+
+In `-server` mode, the plugin caps empty-server updates at 10 FPS and connected-server updates at 60 FPS. It counts transport connections as well as spawned network users, so joining clients restore the active budget before their player finishes loading. Configure `Performance.IdleFrameRate` (5–60) and `Performance.ActiveFrameRate` (30–120) in the plugin config.
+
+After the server initializes, Unity's on-demand rendering runs one rendered frame per second while simulation and networking continue at the chosen update rate. Startup retains normal rendering because loading and end-of-frame callbacks may depend on it. VSync is disabled and the budget is reapplied each update to prevent game quality settings from restoring unlimited rendering. Physics timing is unchanged. Status logs include connection/player counts and the applied budget.
+
+This handles Proton builds that still initialize software graphics despite `-batchmode -nographics`. The Unity API is documented at https://docs.unity3d.com/2021.3/Documentation/ScriptReference/Rendering.OnDemandRendering.html.
